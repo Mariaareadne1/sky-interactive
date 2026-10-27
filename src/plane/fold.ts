@@ -111,34 +111,73 @@ function apply(state: Float32Array, folds: Fold[], progress: number, out: Float3
 export function buildFoldModel(shape: FoldShape = DEFAULT_SHAPE, res = 49): FoldModel {
   const h = shape.size / 2;
   const n = res * res;
+  const cell = (2 * h) / (res - 1);
   const flat = new Float32Array(n * 2);
-  const s0 = new Float32Array(n * 3);
   for (let j = 0; j < res; j++) {
     for (let i = 0; i < res; i++) {
       const k = j * res + i;
-      const x = -h + (2 * h * i) / (res - 1), z = -h + (2 * h * j) / (res - 1);
-      flat[k * 2] = x;
-      flat[k * 2 + 1] = z;
-      s0.set([x, 0, z], k * 3);
+      flat[k * 2] = -h + cell * i;
+      flat[k * 2 + 1] = -h + cell * j;
     }
   }
   const index: number[] = [];
   for (let j = 0; j < res - 1; j++) {
     for (let i = 0; i < res - 1; i++) {
       const a = j * res + i, b = a + 1, c = a + res, d = c + 1;
-      // split each cell along the diagonal that follows the nose creases on its side
-      if (i < (res - 1) / 2) index.push(a, c, b, b, c, d);
-      else index.push(a, c, d, a, d, b);
+      // split each cell along the diagonal that runs with the first creases on its side
+      if (i < (res - 1) / 2) index.push(a, c, d, a, d, b);
+      else index.push(a, c, b, b, c, d);
     }
   }
 
-  const nose: P3 = [0, 0, h];
-  const states: Float32Array[] = [s0];
   const steps: Fold[][] = [];
+  /** A point's position after the first `upto` steps, starting flat at (x, z). */
+  const forward = (k: number, upto: number, x: number, z: number): P3 => {
+    let p: P3 = [x, 0, z];
+    for (let st = 0; st < upto; st++) for (const f of steps[st]) if (f.members[k]) p = rotate(p, f.a, f.d, f.angle);
+    return p;
+  };
+  const stateAfter = (upto: number): Float32Array => {
+    const out = new Float32Array(n * 3);
+    for (let k = 0; k < n; k++) out.set(forward(k, upto, flat[k * 2], flat[k * 2 + 1]), k * 3);
+    return out;
+  };
+  /**
+   * Pull the grid points nearest a crease exactly onto it, so the fold
+   * follows a straight edge instead of the grid's staircase. The crease is a
+   * line in the sheet as it lies before step `upto`; earlier folds are rigid,
+   * so one Newton step through them lands the point exactly.
+   */
+  const snap = (upto: number, half: number, ax: number, az: number, dx: number, dz: number) => {
+    const l = Math.hypot(dx, dz);
+    const nx = -dz / l, nz = dx / l;
+    const e = 1e-4;
+    for (let k = 0; k < n; k++) {
+      if (half * flat[k * 2] <= 0) continue;
+      const x = flat[k * 2], z = flat[k * 2 + 1];
+      const p = forward(k, upto, x, z);
+      const dist = (p[0] - ax) * nx + (p[2] - az) * nz;
+      if (Math.abs(dist) > cell * 0.55 || Math.abs(dist) < 1e-7) continue;
+      const px = forward(k, upto, x + e, z), pz = forward(k, upto, x, z + e);
+      const j00 = (px[0] - p[0]) / e, j01 = (pz[0] - p[0]) / e, j10 = (px[2] - p[2]) / e, j11 = (pz[2] - p[2]) / e;
+      const det = j00 * j11 - j01 * j10;
+      if (Math.abs(det) < 1e-6) continue;
+      const tx = -dist * nx, tz = -dist * nz;
+      const fx = x + (j11 * tx - j01 * tz) / det, fz = z + (-j10 * tx + j00 * tz) / det;
+      // the sheet's own edge stays where it is
+      const onEdge = Math.abs(Math.abs(x) - h) < 1e-6 || Math.abs(Math.abs(z) - h) < 1e-6;
+      if (onEdge || Math.abs(fx) > h || Math.abs(fz) > h) continue;
+      flat[k * 2] = fx;
+      flat[k * 2 + 1] = fz;
+    }
+  };
+
+  const nose: P3 = [0, 0, h];
   const up: P3 = [0, 1, 0];
 
   // A: top corners to the centre line
   {
+    const s0 = stateAfter(0);
     const folds: Fold[] = [];
     for (const side of [1, -1]) {
       const d = normalize([side * h, 0, -h]);
@@ -151,13 +190,13 @@ export function buildFoldModel(shape: FoldShape = DEFAULT_SHAPE, res = 49): Fold
       folds.push({ a: nose, d, members, angle: signed(s0, members, nose, d, Math.PI - FLAT_GAP, up) });
     }
     steps.push(folds);
-    states.push(apply(s0, folds, 1, new Float32Array(n * 3)));
   }
   // B: the slanted edges to the centre again
   {
-    const prev = states[1];
-    const folds: Fold[] = [];
     const t = Math.tan(shape.nose);
+    for (const side of [1, -1]) snap(1, side, 0, h, side * t, -1);
+    const prev = stateAfter(1);
+    const folds: Fold[] = [];
     for (const side of [1, -1]) {
       const d = normalize([side * t, 0, -1]);
       const members = new Uint8Array(n);
@@ -170,11 +209,10 @@ export function buildFoldModel(shape: FoldShape = DEFAULT_SHAPE, res = 49): Fold
       folds.push({ a, d, members, angle: signed(prev, members, a, d, Math.PI - FLAT_GAP * 1.6, up) });
     }
     steps.push(folds);
-    states.push(apply(prev, folds, 1, new Float32Array(n * 3)));
   }
   // C: fold in half, keel down — each half rises to a slim V
   {
-    const prev = states[2];
+    const prev = stateAfter(2);
     const folds: Fold[] = [];
     for (const side of [1, -1]) {
       const members = new Uint8Array(n);
@@ -183,20 +221,20 @@ export function buildFoldModel(shape: FoldShape = DEFAULT_SHAPE, res = 49): Fold
       folds.push({ a, d, members, angle: signed(prev, members, a, d, Math.PI / 2 - shape.vee, up) });
     }
     steps.push(folds);
-    states.push(apply(prev, folds, 1, new Float32Array(n * 3)));
   }
   // D: the wings fold back out, just above level
   const wing = new Float32Array(n);
   {
-    const prevB = states[2];
-    const prev = states[3];
+    for (const side of [1, -1]) snap(2, side, side * shape.keel, 0, 0, 1);
+    const prevB = stateAfter(2);
+    const prev = stateAfter(3);
     const folds: Fold[] = [];
     const rise = Math.PI / 2 - shape.vee;
     for (const side of [1, -1]) {
       const members = new Uint8Array(n);
       for (let k = 0; k < n; k++) {
         const out = side * prevB[k * 3];
-        members[k] = side * flat[k * 2] > 0 && out > shape.keel ? 1 : 0;
+        members[k] = side * flat[k * 2] > 0 && out > shape.keel + 1e-6 ? 1 : 0;
         if (members[k]) wing[k] = out - shape.keel;
       }
       // the crease, where the half has carried it
@@ -205,8 +243,8 @@ export function buildFoldModel(shape: FoldShape = DEFAULT_SHAPE, res = 49): Fold
       folds.push({ a, d, members, angle: signed(prev, members, a, d, rise - shape.dihedral, [side, 0, 0]) });
     }
     steps.push(folds);
-    states.push(apply(prev, folds, 1, new Float32Array(n * 3)));
   }
+  const states = [0, 1, 2, 3, 4].map(stateAfter);
 
   // centre the finished plane: keel bottom KEEL below the origin, middle of its length at z = 0
   const fin = states[4];
