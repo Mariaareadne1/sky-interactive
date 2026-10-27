@@ -6,7 +6,7 @@
 
 The fourth piece after [MEADOW](https://github.com/Mariaareadne1/meadow-interactive) (draw a sheep), [POND](https://github.com/Mariaareadne1/pond-interactive) and [HIVE](https://github.com/Mariaareadne1/hive-interactive): a small painted town on a sheet of paper. Draw anywhere over it and a square of cream paper appears at the start of your line, folds itself crease by crease into a dart, and flies your line — banking into turns, looping where your line loops, its shadow skimming the rooftops — then glides on, comes down on whatever is under it and rocks gently in the breeze.
 
-[Demo video (20 s)](docs/media/sky-demo-720p.mp4) · [Case study](CASE_STUDY.md) · [Art direction](docs/ART_DIRECTION.md) · [Progress](PROGRESS.md)
+**Live: https://sky-interactive.vercel.app** · [Demo video (20 s)](docs/media/sky-demo-720p.mp4) · [Case study](CASE_STUDY.md) · [Art direction](docs/ART_DIRECTION.md) · [Progress](PROGRESS.md)
 
 ## Playing
 

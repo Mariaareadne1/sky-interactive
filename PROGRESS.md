@@ -8,7 +8,7 @@
 | 3. Stroke → 3D flight and flight feel | Done — flight sheet, drawing speed, loop detection, energy, rolling frames, bank, wobble, flex, loop streak, glide and landing |
 | 4. Selection, four actions, dragging, undo/redo, persistence, capture, mobile | Done — 13 Playwright tests in Chromium (dev and production builds) |
 | 5. Polish, scripted demo, gallery, README, case study | Done — `docs/media/`, `CASE_STUDY.md` |
-| Deploy to Vercel | Waiting for the owner's go-ahead |
+| Deploy to Vercel | Done 2026-10-27 — https://sky-interactive.vercel.app (CLI deploy; redeploy with `npx vercel --prod`) |
 
 ## Numbers (2026-10-27)
 

@@ -38,7 +38,8 @@ So the whole piece lives or dies on one moment: you draw a line, and a plane fol
 
 ## What's incomplete
 
-- Not deployed. Deploying to Vercel waits on the owner's go-ahead.
+(Live at https://sky-interactive.vercel.app.)
+
 - Only Chromium is tested; Safari and Firefox are untested.
 - The plane is lit and shadowed but doesn't cast onto other planes in a meaningful way, and planes pass through each other (collisions were out of scope by design).
 - A plane that stalls against a tall wall flutters straight down beside it — honest, but less graceful than a landing.
