@@ -290,11 +290,11 @@ export function createProps(world: WorldUniforms, reducedMotion = false): Props 
   }
 
   // the churchyard wall and its cat
-  const wallLen = WALL.z1 - WALL.z0;
-  const stoneGeo = withAO(new THREE.BoxGeometry(WALL.thick, WALL.height, wallLen, 1, 1, 8));
+  const wallLen = WALL.x1 - WALL.x0;
+  const stoneGeo = withAO(new THREE.BoxGeometry(wallLen, WALL.height, WALL.thick, 10, 1, 1));
   const wall = caster(new THREE.Mesh(stoneGeo, paintMaterial(world, { color: '#cfc5b2', softness: 0.15 })));
-  const wz = (WALL.z0 + WALL.z1) / 2;
-  wall.position.set(WALL.x, groundHeight(WALL.x, wz) + WALL.height / 2 - 0.02, wz);
+  const wx = (WALL.x0 + WALL.x1) / 2;
+  wall.position.set(wx, groundHeight(wx, WALL.z) + WALL.height / 2 - 0.02, WALL.z);
   group.add(wall);
   const cat = new THREE.Group();
   cat.name = 'cat';
@@ -308,8 +308,9 @@ export function createProps(world: WorldUniforms, reducedMotion = false): Props 
   );
   cat.add(body, tail, eyes);
   cat.position.set(CAT.x, groundHeight(CAT.x, CAT.z) + WALL.height - 0.02, CAT.z);
-  // facing out over the lane, toward the camera
-  cat.rotation.y = -Math.PI / 2 + 0.5;
+  // sitting side-on along the wall, head turned a little toward us
+  cat.rotation.y = -0.35;
+  cat.scale.setScalar(1.5);
   group.add(cat);
 
   const washing = washingLine(world);

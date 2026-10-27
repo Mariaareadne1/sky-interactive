@@ -255,9 +255,9 @@ export const TREES: readonly Tree[] = TREE_SPOTS.filter(
   (t) => !HOUSES.some((h) => Math.hypot(h.x - t.x, h.z - t.z) < Math.hypot(h.w, h.d) / 2 + t.r + 0.1) && laneDistance(t.x, t.z) > t.r * 0.6,
 );
 
-/** A low stone wall along the churchyard's east side. A cat sits on it. */
-export const WALL = { x: CHURCHYARD.x + CHURCHYARD.hu + 0.05, z0: -5.2, z1: -2.45, height: 0.26, thick: 0.17 };
-export const CAT = { x: WALL.x, z: -3.55 };
+/** A low stone wall along the churchyard's front, stopping short of the path. A cat sits on it. */
+export const WALL = { z: CHURCHYARD.z + CHURCHYARD.hv + 0.02, x0: CHURCHYARD.x - CHURCHYARD.hu + 0.2, x1: -6.45, height: 0.26, thick: 0.17 };
+export const CAT = { x: -7.6, z: WALL.z };
 
 // --- height -------------------------------------------------------------------------
 
@@ -325,7 +325,7 @@ export function surfaceAt(x: number, z: number): { y: number; kind: SurfaceKind 
       }
     }
   }
-  if (Math.abs(x - WALL.x) < WALL.thick / 2 + 0.02 && z > WALL.z0 && z < WALL.z1 && g + WALL.height > y) {
+  if (Math.abs(z - WALL.z) < WALL.thick / 2 + 0.02 && x > WALL.x0 && x < WALL.x1 && g + WALL.height > y) {
     y = g + WALL.height;
     kind = 'wall';
   }
@@ -389,4 +389,4 @@ export function sheetHeight(x: number, z: number): number {
 }
 
 /** Where a plane may wander before it is steered back toward the town. */
-export const SAFE = { halfX: TILE.halfX - 1.4, halfZ: TILE.halfZ - 1.3 };
+export const SAFE = { halfX: TILE.halfX - 2.8, halfZ: TILE.halfZ - 2.0 };

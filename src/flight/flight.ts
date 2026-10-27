@@ -241,7 +241,7 @@ function glideDown(start: V3, dir: V3, speed: number): Glide {
     }
     let ahead = -Infinity;
     for (const k of [0.15, 0.35, 0.6, 0.9]) ahead = Math.max(ahead, surfaceHeight(p[0] + h[0] * k, p[2] + h[2] * k));
-    let target = -0.36;
+    let target = -0.44;
     if (alt < 0.55) target = -0.13; // flare
     if (p[1] - KEEL < ahead + 0.1 && ahead > ground + 0.05) target = 0.22; // lift over the ridge ahead
     // a wall it can't clear: bank away from it and come down before it

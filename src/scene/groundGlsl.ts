@@ -35,7 +35,7 @@ const footprints: Box[] = [
   ...HOUSES.map((h) => ({ x: h.x, z: h.z, hu: h.w / 2, hv: h.d / 2, rot: h.rot, r: 0.04 })),
   { x: CHURCH.nave.x, z: CHURCH.nave.z, hu: CHURCH.nave.w / 2, hv: CHURCH.nave.d / 2, rot: CHURCH.nave.rot, r: 0.04 },
   { x: CHURCH.tower.x, z: CHURCH.tower.z, hu: CHURCH.tower.half, hv: CHURCH.tower.half, rot: 0, r: 0.03 },
-  { x: WALL.x, z: (WALL.z0 + WALL.z1) / 2, hu: WALL.thick / 2, hv: (WALL.z1 - WALL.z0) / 2, rot: 0, r: 0.02 },
+  { x: (WALL.x0 + WALL.x1) / 2, z: WALL.z, hu: (WALL.x1 - WALL.x0) / 2, hv: WALL.thick / 2, rot: 0, r: 0.02 },
 ];
 const footFns = footprints.map((b, i) => boxFn(`foot${i}`, b)).join('\n');
 const footPick = footprints.map((_, i) => `  d = min(d, foot${i}(p));`).join('\n');

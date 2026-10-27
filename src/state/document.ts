@@ -1,7 +1,7 @@
 import type { PathPoint } from '../flight/path';
 import { MAX_PATH_POINTS } from '../flight/path';
-import { buildFlight } from '../flight/flight';
-import { TILE } from '../scene/town';
+import { GREEN, HOUSES, TILE, surfaceHeight } from '../scene/town';
+import { KEEL } from '../flight/flight';
 
 /**
  * The persisted sky: plain, versioned, immutable data. Each plane keeps the
@@ -164,16 +164,24 @@ function plane(id: string, path: PathPoint[], seed: number, landed: Landed | nul
   return { id, path, seed, landed };
 }
 
-/** Where a path's flight comes to rest, worked out ahead of time. */
-function settled(path: PathPoint[], seed: number): Landed {
-  const { rest } = buildFlight(path, { seed });
-  return { x: rest.x, y: rest.y, z: rest.z, heading: rest.heading };
+/** Resting on whatever is at (x, z), facing `heading`. */
+function restingAt(x: number, z: number, heading: number): Landed {
+  return { x, y: surfaceHeight(x, z) + KEEL * 0.85, z, heading };
 }
 
-/** First visit: a couple of planes already resting in town, waiting to be flown again. */
+/** First visit: two planes already resting in town — one on the green, one on a roof — waiting to be flown again. */
 export function defaultDoc(): SkyDoc {
   const a = SHOWCASE[1], b = SHOWCASE[2];
-  return { version: DOC_VERSION, planes: [plane('rest-1', a.path(), a.seed, settled(a.path(), a.seed)), plane('rest-2', b.path(), b.seed, settled(b.path(), b.seed))] };
+  // the cottage nearest the front of the high street
+  const roof = [...HOUSES].sort((h1, h2) => Math.hypot(h1.x - 1.5, h1.z - 5) - Math.hypot(h2.x - 1.5, h2.z - 5))[0];
+  return {
+    version: DOC_VERSION,
+    planes: [
+      plane('rest-1', a.path(), a.seed, restingAt(GREEN.x - 0.4, GREEN.z + 0.5, 0.9)),
+      // on the slope facing the lane, away from the chimney on the ridge
+      plane('rest-2', b.path(), b.seed, restingAt(roof.x + Math.sin(roof.rot) * roof.d * 0.25 * roof.front, roof.z + Math.cos(roof.rot) * roof.d * 0.25 * roof.front, Math.PI / 2 - roof.rot)),
+    ],
+  };
 }
 
 /** Several flights in the air at once. */
