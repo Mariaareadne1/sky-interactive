@@ -1,7 +1,8 @@
 // Documentation stills: node scripts/gallery.mjs  ->  docs/media/*.jpg
+// (run scripts/fold.mjs and scripts/flight.mjs loop 1 16 0.35 first for the strips)
 import { chromium } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import ffmpeg from 'ffmpeg-static';
 
 mkdirSync('docs/media', { recursive: true });
@@ -16,37 +17,48 @@ async function open(query, viewport = { width: 1600, height: 1000 }) {
   await page.evaluate(() => window.__sky.store.set({ uiHidden: true }));
   return page;
 }
+const step = (page, seconds) => page.evaluate((s) => {
+  const e = window.__sky.engine;
+  e.stop();
+  for (let i = 0; i < Math.round(s * 60); i++) e.tick(1 / 60);
+}, seconds);
 
-// the hero: a busy garden, bees out
-let page = await open('showcase');
-await page.waitForTimeout(14000);
+// the town at rest
+let page = await open('empty');
+await page.waitForTimeout(2500);
 await page.screenshot({ path: 'artifacts/g-01.png' });
-jpg('artifacts/g-01.png', 'docs/media/01-garden.jpg');
-// golden hour over the same garden
-await page.evaluate(() => window.__sky.app.bees.setGolden(1));
-await page.waitForTimeout(4000);
+jpg('artifacts/g-01.png', 'docs/media/01-town.jpg');
+await page.close();
+
+// the showcase: four flights in the air, shadows on the roofs
+page = await open('showcase');
+await step(page, 3.4);
 await page.screenshot({ path: 'artifacts/g-02.png' });
-jpg('artifacts/g-02.png', 'docs/media/02-golden-hour.jpg');
-// with the interface and a selection
-await page.evaluate(() => { const h = window.__sky; h.app.bees.setGolden(0); h.store.set({ uiHidden: false, selection: { kind: 'flower', id: 'sc-sun1' } }); });
-await page.waitForTimeout(3000);
+jpg('artifacts/g-02.png', 'docs/media/02-flights.jpg');
+await page.close();
+
+// first visit, with the interface and a resting plane selected
+page = await open('');
+await page.evaluate(() => {
+  const s = window.__sky;
+  s.store.set({ uiHidden: false, selection: { kind: 'plane', id: 'rest-2' } });
+});
+await page.waitForTimeout(1500);
 await page.screenshot({ path: 'artifacts/g-03.png' });
 jpg('artifacts/g-03.png', 'docs/media/03-selected.jpg');
 await page.close();
 
 // mobile portrait
-page = await open('showcase', { width: 390, height: 844 });
+page = await open('', { width: 390, height: 844 });
 await page.evaluate(() => window.__sky.store.set({ uiHidden: false }));
-await page.waitForTimeout(8000);
+await page.waitForTimeout(2500);
 await page.screenshot({ path: 'artifacts/g-04.png' });
 jpg('artifacts/g-04.png', 'docs/media/04-mobile.jpg', 390);
 await page.close();
 await browser.close();
 
-// strips made by draw.mjs and inspect.mjs, if present
-try {
-  execFileSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', 'artifacts/g-sun-strip.png', '-vf', 'scale=1600:-2', '-q:v', '3', 'docs/media/reveal-strip.jpg']);
-} catch {
-  console.log('run scripts/draw.mjs g-sun line first for the reveal strip');
+for (const [src, out] of [['artifacts/fold-sheet.png', 'docs/media/fold-strip.jpg'], ['artifacts/loop-sheet.png', 'docs/media/flight-strip.jpg']]) {
+  if (existsSync(src)) jpg(src, out, 1600);
+  else console.log(`missing ${src}`);
 }
 console.log('docs/media updated');

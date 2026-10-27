@@ -389,4 +389,4 @@ export function sheetHeight(x: number, z: number): number {
 }
 
 /** Where a plane may wander before it is steered back toward the town. */
-export const SAFE = { halfX: TILE.halfX - 2.8, halfZ: TILE.halfZ - 2.0 };
+export const SAFE = { halfX: TILE.halfX - 2.4, halfZ: TILE.halfZ - 1.9 };

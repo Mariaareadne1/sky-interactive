@@ -216,8 +216,9 @@ interface Glide {
 
 /**
  * Carry on from the end of the line: settle into a glide slope, steer back
- * over the town if the glide would leave it, lift over a roof ridge ahead,
- * flare near the ground, and bank away from a wall it can't clear.
+ * over the town if the glide would leave it,
+ * flare near the ground, lift over a low wall, bank away from a tall one —
+ * and come down on a roof slope like anywhere else.
  */
 function glideDown(start: V3, dir: V3, speed: number): Glide {
   let p = start;
@@ -230,7 +231,8 @@ function glideDown(start: V3, dir: V3, speed: number): Glide {
     const ground = surfaceHeight(p[0], p[2]);
     const alt = p[1] - KEEL - ground;
     // steer back over the town when the glide is heading off it
-    const look = Math.min(5, Math.max(1.4, alt * 3));
+    // where the glide would come down from here
+    const look = Math.min(5, Math.max(1.2, alt * 2.1));
     const px = p[0] + h[0] * look, pz = p[2] + h[2] * look;
     if (Math.abs(px) > SAFE.halfX || Math.abs(pz) > SAFE.halfZ) {
       const want = norm([-p[0], 0, -p[2]]);
@@ -239,40 +241,43 @@ function glideDown(start: V3, dir: V3, speed: number): Glide {
       const c = Math.cos(a * turn), s = Math.sin(a * turn);
       h = norm([h[0] * c + h[2] * s, 0, -h[0] * s + h[2] * c]);
     }
-    let ahead = -Infinity;
-    for (const k of [0.15, 0.35, 0.6, 0.9]) ahead = Math.max(ahead, surfaceHeight(p[0] + h[0] * k, p[2] + h[2] * k));
-    let target = -0.44;
+    let target = -0.55;
     if (alt < 0.55) target = -0.13; // flare
-    if (p[1] - KEEL < ahead + 0.1 && ahead > ground + 0.05) target = 0.22; // lift over the ridge ahead
-    // a wall it can't clear: bank away from it and come down before it
-    const blocked = (dx: number, dz: number) =>
-      [0.12, 0.3, 0.5].some((k) => {
+    // Walls (a sudden step up: the side of a house, the tower) are cleared or
+    // avoided; roof slopes are fine to come down on, so they are not walls.
+    const bottom = p[1] - KEEL;
+    const wallAhead = (dx: number, dz: number, reach: number): number => {
+      let prev = ground;
+      for (let k = 0.1; k <= reach + 1e-6; k += 0.1) {
         const s2 = surfaceHeight(p[0] + dx * k, p[2] + dz * k);
-        return s2 - (p[1] - KEEL) > 0.05 && s2 - ground > 0.15;
-      });
-    if (blocked(h[0], h[2])) {
+        if (s2 - prev > 0.12 && s2 > bottom - 0.02) return s2 - bottom; // how far above the keel its top is
+        prev = s2;
+      }
+      return -1;
+    };
+    const wall = wallAhead(h[0], h[2], 1.4);
+    if (wall >= 0 && wall < 0.35) target = 0.25; // a low wall: lift over it
+    else if (wall >= 0.35) {
+      // too tall to clear: bank away from it and come down before it
       const lt: V3 = [h[2], 0, -h[0]];
-      const side = blocked(lt[0], lt[2]) ? -1 : 1;
-      const a = 2.2 * DS * side;
+      const side = wallAhead(lt[0], lt[2], 1.4) >= 0 ? -1 : 1;
+      const a = 1.4 * DS * side;
       h = norm([h[0] * Math.cos(a) + h[2] * Math.sin(a), 0, -h[0] * Math.sin(a) + h[2] * Math.cos(a)]);
       target = -0.5;
     }
-    pitch += (target - pitch) * 0.06;
+    pitch += (target - pitch) * 0.09;
     const T: V3 = [h[0] * Math.cos(pitch), Math.sin(pitch), h[2] * Math.cos(pitch)];
     const next = add(p, T, DS);
     const nextGround = surfaceHeight(next[0], next[2]);
-    if (nextGround - (next[1] - KEEL) > 0.05 && nextGround - ground > 0.15) {
-      // nose against a wall after all: stop here and drop down beside it
+    if (nextGround - (next[1] - KEEL) > 0.05 && nextGround - ground > 0.12) {
+      // nose against a wall after all: stop here and flutter down beside it
       return { pts, dir: T, speed: spd, pitch };
     }
     spd = Math.sqrt(Math.max(MIN_FLY_SPEED ** 2, spd * spd - 2 * G_ENERGY * (next[1] - p[1])));
     spd += (GLIDE_SPEED - spd) * 0.01;
+    // touching down: end on the last point still above the surface (the slide covers the last centimetre)
+    if (next[1] - KEEL <= nextGround || step === 1199) return { pts, dir: T, speed: spd, pitch };
     p = next;
-    if (p[1] - KEEL <= nextGround || step === 1199) {
-      p = [p[0], nextGround + KEEL, p[2]];
-      pts.push({ p, v: spd, src: -1, loop: 0 });
-      return { pts, dir: T, speed: spd, pitch };
-    }
     pts.push({ p, v: spd, src: -1, loop: 0 });
   }
   return { pts, dir: h, speed: spd, pitch };
@@ -440,7 +445,9 @@ export function buildFlight(path: readonly PathPoint[], opts: FlightOptions): Fl
       break;
     }
   }
-  const duration = Math.min(0.9, Math.max(0.3, (2 * dist) / vH));
+  // a plane that stalled against a wall flutters the last of the way down
+  const drop = Math.max(0, touch[1] - KEEL - surfaceHeight(touch[0], touch[2]));
+  const duration = Math.max(Math.min(0.9, Math.max(0.3, (2 * dist) / vH)), drop > 0.1 ? 0.45 + drop * 1.1 : 0);
   const rx = touch[0] + hdir[0] * dist, rz = touch[2] + hdir[2] * dist;
   const surf = surfaceAt(rx, rz);
   const rest: Rest = { x: rx, y: surf.y + KEEL * 0.85, z: rz, heading: Math.atan2(hdir[0], hdir[2]), kind: surf.kind };
@@ -542,7 +549,7 @@ export function sampleFlight(plan: FlightPlan, t: number, out: FlightSample = cr
     const y = Math.max(ground, ty + (rest.y - ty) * smoothstep(0, 0.4, k)) + 0.045 * Math.abs(Math.sin((Math.PI * tl) / 0.2)) * Math.exp(-tl * 7);
     out.pos.set(x, y, z);
     _qa.fromArray(plan.quat, (plan.n - 1) * 4);
-    out.quat.slerpQuaternions(_qa, plan.restQuat, smoothstep(0, 0.45, tl));
+    out.quat.slerpQuaternions(_qa, plan.restQuat, smoothstep(0, Math.min(0.45, slide.duration), tl));
     out.speed = (1 - k) * 2;
     return out;
   }
